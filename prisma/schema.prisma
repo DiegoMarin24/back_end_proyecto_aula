@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  tecnico
+  user
+}
+
+enum AssetStatus {
+  available
+  in_use
+  maintenance
+  retired
+}
+
+enum TicketStatus {
+  open
+  in_progress
+  pending
+  resolved
+  closed
+}
+
+enum TicketPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole @default(user)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ticketsCreated  Ticket[] @relation("TicketCreatedBy")
+  ticketsAssigned Ticket[] @relation("TicketAssignedTo")
+}
+
+model Asset {
+  id           String      @id @default(uuid())
+  name         String
+  category     String
+  serialNumber String      @unique
+  status       AssetStatus @default(available)
+  location     String
+  purchaseDate DateTime
+  value        Float
+  assignedTo   String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  tickets Ticket[]
+}
+
+model Ticket {
+  id          String         @id @default(uuid())
+  title       String
+  description String
+  status      TicketStatus   @default(open)
+  priority    TicketPriority @default(medium)
+  category    String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  resolvedAt  DateTime?
+
+  asset   Asset?  @relation(fields: [assetId], references: [id])
+  assetId String?
+
+  createdBy   User   @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  createdById String
+
+  assignedTo   User?   @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+  assignedToId String?
+}
