@@ -7,7 +7,7 @@ export async function getAll(_req: Request, res: Response): Promise<void> {
   try {
     const users = await prisma.user.findMany({
       select: { id: true, name: true, email: true, role: true, createdAt: true },
-      orderBy: { name: 'asc' },
+      orderBy: { createdAt: 'desc' },
     });
     res.json(users);
   } catch (error) {
@@ -18,26 +18,34 @@ export async function getAll(_req: Request, res: Response): Promise<void> {
 
 export async function create(req: Request, res: Response): Promise<void> {
   try {
-    const { name, email, password, role } = req.body as {
-      name: string; email: string; password: string; role?: UserRole;
-    };
-
-    if (!name || !email || !password) {
-      res.status(400).json({ error: 'Nombre, email y contraseña son requeridos' });
-      return;
-    }
-
+    const { name, email, password, role } = req.body as { name: string; email: string; password: string; role?: UserRole };
+    if (!name || !email || !password) { res.status(400).json({ error: 'Nombre, email y contraseña son requeridos' }); return; }
     const hashed = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
+    const user   = await prisma.user.create({
       data: { name, email, password: hashed, role: role ?? 'user' },
       select: { id: true, name: true, email: true, role: true, createdAt: true },
     });
     res.status(201).json(user);
   } catch (error: unknown) {
-    if ((error as { code?: string }).code === 'P2002') {
-      res.status(400).json({ error: 'El email ya está registrado' });
-      return;
-    }
+    if ((error as { code?: string }).code === 'P2002') { res.status(400).json({ error: 'El email ya está registrado' }); return; }
     res.status(500).json({ error: 'Error al crear usuario' });
+  }
+}
+
+export async function updateRole(req: Request, res: Response): Promise<void> {
+  try {
+    const { role } = req.body as { role: UserRole };
+    const validRoles: UserRole[] = ['admin', 'tecnico', 'user'];
+    if (!validRoles.includes(role)) { res.status(400).json({ error: 'Rol inválido' }); return; }
+
+    const user = await prisma.user.update({
+      where: { id: Array.isArray(req.params.id) ? req.params.id[0] : req.params.id },
+      data: { role },
+      select: { id: true, name: true, email: true, role: true },
+    });
+    res.json(user);
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === 'P2025') { res.status(404).json({ error: 'Usuario no encontrado' }); return; }
+    res.status(500).json({ error: 'Error al actualizar el rol' });
   }
 }
